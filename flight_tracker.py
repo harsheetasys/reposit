@@ -1,8 +1,7 @@
-
-from time import sleep, strftime
+from time import sleep
 import requests
-import webbrowser
-from colorama import Fore
+from bs4 import BeautifulSoup
+from colorama import Fore, Style
 import flightradar24 as fl
 
 api = fl.Api()
@@ -43,25 +42,29 @@ def list_flights(arr_iata, dep_iata, year, month, date, hour):
     try:
         base_url = f'https://www.flightstats.com/v2/flight-tracker/route/{arr_iata}/{dep_iata}/?year={year}&month={month}&date={date}&hour={hour}'
         res = requests.get(base_url)
-        html_content = res.text
+        soup = BeautifulSoup(res.content, 'html.parser')
 
         flights = []
         departure_time = []
         arrival_time = []
 
-        # Extract flight data using string manipulation or regex
-        # Example:
-        # flights_data = re.findall(r'<h2 class="flights-list-bold-text flights-list-margined leftText">(.*?)</h2>', html_content)
-        # departure_time_data = re.findall(r'<h2 class="flights-list-bold-text flights-list-margined departureTimePadding">(.*?)</h2>', html_content)
-        # arrival_time_data = re.findall(r'<h2 class="flights-list-light-text flights-list-margined">(.*?)</h2>', html_content)
+        flights_data = soup.find_all('h2', class_='flights-list-bold-text flights-list-margined leftText')
+        dept_time_data = soup.find_all('h2', class_='flights-list-bold-text flights-list-margined departureTimePadding')
+        arr_time_data = soup.find_all('h2', class_='flights-list-light-text flights-list-margined')
 
-        # Sample logic, actual implementation may vary based on HTML structure
-        # for flight_data, dep_time, arr_time in zip(flights_data, departure_time_data, arrival_time_data):
-        #     flights.append(flight_data.strip())
-        #     departure_time.append(dep_time.strip())
-        #     arrival_time.append(arr_time.strip())
+        if len(flights_data) and len(dept_time_data) and len(arr_time_data) != 0:
+            for flight in flights_data:
+                flights.append(flight.text.strip())
 
-        return flights, departure_time, arrival_time, base_url
+            for dep_time in dept_time_data:
+                departure_time.append(dep_time.text.strip())
+
+            for arr_time in arr_time_data:
+                arrival_time.append(arr_time.text.strip())
+
+            return flights, departure_time, arrival_time, base_url
+        else:
+            return None
     except Exception as e:
         print(f"Error fetching flight list: {e}")
         return None
@@ -72,23 +75,21 @@ def flight_status(flight_id, year, month, date):
         id = flight_id.split()[1]
         base_url = f'https://www.flightstats.com/v2/flight-tracker/{airline}/{id}?year=20{year}&month={month}&date={date}'
         res = requests.get(base_url)
-        html_content = res.text
+        soup = BeautifulSoup(res.content, 'html.parser')
 
-        # Extract necessary details using string manipulation or regex
-        # Example:
-        # status = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 iicbYn">(.*?)</div>', html_content).group(1).strip()
-        # dep_city = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 efwouT">(.*?)</div>', html_content).group(1).strip()
-        # dep_airport = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 cHdMkI">(.*?)</div>', html_content).group(1).strip()
-        # arr_city = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 efwouT">(.*?)</div>', html_content).group(1).strip()
-        # arr_airport = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 cHdMkI">(.*?)</div>', html_content).group(1).strip()
-        # scheduled_dep_time = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
-        # actual_dep_time = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
-        # scheduled_arr_time = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
-        # actual_arr_time = re.search(r'<div class="text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
-        # terminal_dep = re.search(r'<div class="ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
-        # gate_dep = re.search(r'<div class="ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
-        # terminal_arr = re.search(r'<div class="ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
-        # gate_arr = re.search(r'<div class="ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx">(.*?)</div>', html_content).group(1).strip()
+        status = soup.find("div", class_='text-helper__TextHelper-sc-8bko4a-0 iicbYn').text.strip()
+        dep_city = soup.find_all("div", class_='text-helper__TextHelper-sc-8bko4a-0 efwouT')[0].text.strip()
+        dep_airport = soup.find_all('div', class_='text-helper__TextHelper-sc-8bko4a-0 cHdMkI')[0].text.strip()
+        arr_city = soup.find_all("div", class_='text-helper__TextHelper-sc-8bko4a-0 efwouT')[1].text.strip()
+        arr_airport = soup.find_all('div', class_='text-helper__TextHelper-sc-8bko4a-0 cHdMkI')[1].text.strip()
+        scheduled_dep_time = soup.find_all("div", class_='text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[0].text.strip()
+        actual_dep_time = soup.find_all("div", class_='text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[1].text.strip()
+        scheduled_arr_time = soup.find_all("div", class_='text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[2].text.strip()
+        actual_arr_time = soup.find_all("div", class_='text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[3].text.strip()
+        terminal_dep = soup.find_all("div", class_='ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[0].text.strip()
+        gate_dep = soup.find_all("div", class_='ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[1].text.strip()
+        terminal_arr = soup.find_all("div", class_='ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[2].text.strip()
+        gate_arr = soup.find_all("div", class_='ticket__TGBValue-sc-1rrbl5o-16 hUgYLc text-helper__TextHelper-sc-8bko4a-0 kbHzdx')[3].text.strip()
 
         return status, arr_city, arr_airport, dep_city, dep_airport, scheduled_arr_time, actual_arr_time, scheduled_dep_time, actual_dep_time, terminal_arr, gate_arr, terminal_dep, gate_dep
     except Exception as e:
@@ -121,9 +122,90 @@ def display_flight_details(data):
         print(Fore.RED + "--" * 40 + Fore.RESET)
 
 def main_menu():
-    print()
-    print('''███████╗██╗     ██╗ ██████╗ ██╗  ██╗████████╗    ████████╗██████╗  █████╗  ██████╗██╗  ██╗███████╗██████╗     
-██╔════╝██║     ██║██╔════╝ ██║  ██║╚══██╔══╝    ╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗    
-█████╗  ██║     ██║██║  ███╗███████║   ██║          ██║   ██████╔╝███████║██║     █████╔╝ █████╗  ██████╔╝    
-██╔══╝  ██║     ██║██║   ██║██╔══██║   ██║          ██║   ██
-          ''')
+    while True:
+        print()
+        print(Fore.BLUE + "█████████████████████████████████████████████████████████████████████████████████████████████████████████████████" + Fore.RESET)
+        print(Fore.BLUE + "                                 [ 1 ] LIST FLIGHTS                                                        " + Fore.RESET)
+        print(Fore.BLUE + "                                 [ 2 ] FLIGHT STATUS                                                       " + Fore.RESET)
+        print(Fore.BLUE + "                                 [ 3 ] AIRLINE NAME                                                         " + Fore.RESET)
+        print(Fore.BLUE + "                                 [ 4 ] AIRPORT NAME                                                         " + Fore.RESET)
+        print(Fore.BLUE + "                                 [ 5 ] EXIT PROGRAM                                                        " + Fore.RESET)
+        print(Fore.BLUE + "                                 [ 6 ] Update the System                                                   " + Fore.RESET)
+        print(Fore.BLUE + "█████████████████████████████████████████████████████████████████████████████████████████████████████████████████" + Fore.RESET)
+        print()
+
+        choice = input(Fore.YELLOW + "Enter your choice (1-5): " + Fore.RESET).strip()
+
+        if choice == '1':
+            arr_iata = input("Enter arrival airport IATA code: ").strip().upper()
+            dep_iata = input("Enter departure airport IATA code: ").strip().upper()
+            year = input("Enter year: ").strip()
+            month = input("Enter month: ").strip()
+            date = input("Enter date: ").strip()
+            hour = input("Enter hour: ").strip()
+
+            flights_data = list_flights(arr_iata, dep_iata, year, month, date, hour)
+
+            if flights_data:
+                flights, departure_time, arrival_time, base_url = flights_data
+                print(Fore.CYAN + "--" * 40 + Fore.RESET)
+                print(Fore.CYAN + f"Flight List for {dep_iata} to {arr_iata} on {date}-{month}-{year} at {hour}:00" + Fore.RESET)
+                for i in range(len(flights)):
+                    print(Fore.CYAN + f"Flight: {flights[i]}, Departure Time: {departure_time[i]}, Arrival Time: {arrival_time[i]}" + Fore.RESET)
+                print(Fore.CYAN + "--" * 40 + Fore.RESET)
+            else:
+                print(Fore.RED + "No flights found for the given parameters." + Fore.RESET)
+
+        elif choice == '2':
+            flight_id = input("Enter airline code and flight number (e.g., DL 123): ").strip().upper()
+            year = input("Enter year: ").strip()
+            month = input("Enter month: ").strip()
+            date = input("Enter date: ").strip()
+
+            flight_data = flight_status(flight_id, year, month, date)
+
+            if flight_data:
+                display_flight_details(flight_data)
+            else:
+                print(Fore.RED + "Flight status not found for the given parameters." + Fore.RESET)
+
+        elif choice == '3':
+            airline_name = input("Enter airline name (or part of it): ").strip().upper()
+            airline_codes = get_airline_code(airline_name)
+
+            if airline_codes:
+                print(Fore.CYAN + "--" * 40 + Fore.RESET)
+                print(Fore.CYAN + "Airline Codes:" + Fore.RESET)
+                for airline in airline_codes:
+                    print(Fore.CYAN + f"Name: {airline['Name']}, Code: {airline['Code']}" + Fore.RESET)
+                print(Fore.CYAN + "--" * 40 + Fore.RESET)
+            else:
+                print(Fore.RED + "No airlines found with the given name." + Fore.RESET)
+
+        elif choice == '4':
+            country = input("Enter country name to fetch airport IATA codes: ").strip().capitalize()
+            airports = get_airport_iata(country)
+
+            if airports:
+                print(Fore.CYAN + "--" * 40 + Fore.RESET)
+                print(Fore.CYAN + f"Airports in {country}:" + Fore.RESET)
+                for airport in airports:
+                    print(Fore.CYAN + f"Name: {airport['name']}, IATA Code: {airport['iata']}" + Fore.RESET)
+                print(Fore.CYAN + "--" * 40 + Fore.RESET)
+            else:
+                print(Fore.RED + "No airports found in the given country." + Fore.RESET)
+
+        elif choice == '5':
+            print("Exiting program...")
+            break
+
+        elif choice == '6':
+            print("Updating the system...")
+            sleep(2)  # Simulate update process
+            print("System updated successfully!")
+
+        else:
+            print(Fore.RED + "Invalid choice! Please enter a number from 1 to 5." + Fore.RESET)
+
+if __name__ == "__main__":
+    main_menu()
